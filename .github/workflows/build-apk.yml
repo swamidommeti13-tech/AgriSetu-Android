@@ -8,38 +8,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract Android project
-        run: |
-          mkdir android_project
-          unzip -q AgriSetuAndroid_Project.zip -d android_project
-
-      - name: Find project
-        run: |
-          echo "Project contents:"
-          find android_project -maxdepth 4 -type f | head -100
-
-      - name: Set up Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build APK
+      - name: Install SDK packages
         run: |
-          GRADLEW=$(find android_project -name gradlew -type f | head -1)
-          PROJECT_DIR=$(dirname "$GRADLEW")
-          cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Download Gradle
+        run: |
+          curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q gradle.zip
+          echo "$PWD/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Extract Android project
+        run: |
+          unzip -q AgriSetuAndroid_APK_Ready.zip
+          test -f AgriSetuAndroid/settings.gradle
+
+      - name: Build APK
+        working-directory: AgriSetuAndroid
+        run: |
+          gradle --no-daemon clean assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AgriSetu-APK
-          path: android_project/**/build/outputs/apk/debug/*.apk
+          path: AgriSetuAndroid/app/build/outputs/apk/debug/app-debug.apk
